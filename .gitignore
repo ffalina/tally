@@ -1,0 +1,27 @@
+# build artifacts
+bin/
+dist/
+build/
+*.exe
+*.out
+*.test
+
+# go test and coverage output
+coverage.out
+*.cover
+
+# dependency/vendor cache
+vendor/
+
+# local environment files
+.env
+.env.*
+.etc/
+
+# editor/os files
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db

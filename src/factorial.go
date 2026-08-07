@@ -31,7 +31,7 @@ func Combination(a int, b int) int {
 	return c
 }
 
-func Permuration(a int, b int) int {
+func Permutation(a int, b int) int {
 	if b > a || b < 0 {
 		return 0
 	}

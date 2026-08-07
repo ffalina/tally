@@ -14,6 +14,9 @@ const (
 	Operator
 	Function
 	Variable
+	Constant
+	Comma
+	Postfix
 	LeftParen
 	RightParen
 )
@@ -21,6 +24,7 @@ const (
 type Token struct {
 	Type  TokenType
 	Value string
+	Argc  int
 }
 
 func tokenize(input string) ([]Token, error) {
@@ -55,41 +59,56 @@ func tokenize(input string) ([]Token, error) {
 			if _, err := strconv.ParseFloat(value, 64); err != nil {
 				return nil, fmt.Errorf("invalid number %q", value)
 			}
-			tokens = append(tokens, Token{Number, value})
+			tokens = append(tokens, Token{Type: Number, Value: value})
 			expectNumber = false
 			continue
 		}
 
 		if unicode.IsLetter(rune(ch)) {
 			start := i
-			for i < len(input) && unicode.IsLetter(rune(input[i])) {
+			for i < len(input) && (unicode.IsLetter(rune(input[i])) || unicode.IsDigit(rune(input[i]))) {
 				i++
 			}
 			value := input[start:i]
-			tokenType := Function
-			if value == "x" {
-				tokenType = Variable
+			switch value {
+			case "x":
+				tokens = append(tokens, Token{Type: Variable, Value: value})
+			case "pi", "e":
+				tokens = append(tokens, Token{Type: Constant, Value: value})
+			default:
+				tokens = append(tokens, Token{Type: Function, Value: value, Argc: 1})
 			}
-			tokens = append(tokens, Token{tokenType, value})
 			expectNumber = false
 			continue
 		}
 
 		if strings.ContainsRune("+-*/^", rune(ch)) {
-			tokens = append(tokens, Token{Operator, string(ch)})
+			tokens = append(tokens, Token{Type: Operator, Value: string(ch)})
 			i++
 			expectNumber = true
 			continue
 		}
 
 		if ch == '(' {
-			tokens = append(tokens, Token{LeftParen, "("})
+			tokens = append(tokens, Token{Type: LeftParen, Value: "("})
 			i++
 			expectNumber = true
 			continue
 		}
 		if ch == ')' {
-			tokens = append(tokens, Token{RightParen, ")"})
+			tokens = append(tokens, Token{Type: RightParen, Value: ")"})
+			i++
+			expectNumber = false
+			continue
+		}
+		if ch == ',' {
+			tokens = append(tokens, Token{Type: Comma, Value: ","})
+			i++
+			expectNumber = true
+			continue
+		}
+		if ch == '!' {
+			tokens = append(tokens, Token{Type: Postfix, Value: "!"})
 			i++
 			expectNumber = false
 			continue
@@ -120,11 +139,24 @@ func toRPN(tokens []Token) ([]Token, error) {
 	for _, tok := range tokens {
 		switch tok.Type {
 
-		case Number, Variable:
+		case Number, Variable, Constant:
 			output = append(output, tok)
 
 		case Function:
 			stack = append(stack, tok)
+
+		case Postfix:
+			output = append(output, tok)
+
+		case Comma:
+			for len(stack) > 0 && stack[len(stack)-1].Type != LeftParen {
+				output = append(output, stack[len(stack)-1])
+				stack = stack[:len(stack)-1]
+			}
+			if len(stack) < 2 || stack[len(stack)-2].Type != Function {
+				return nil, fmt.Errorf("comma is only allowed between function arguments")
+			}
+			stack[len(stack)-2].Argc++
 
 		case Operator:
 			if _, ok := precedence[tok.Value]; !ok {
@@ -190,10 +222,14 @@ func main() {
 	tests := []string{
 		"2 + 3 * 4",
 		"sqrt(16)",
-		"sin(0)",
+		"sin(90)",
 		"2^3 + 1",
 		"abs(-5) + 3",
 		"3 + 4 * 2 / (1 - 5)^2",
+		"5!",
+		"log(8, 2)",
+		"C(5, 2)",
+		"2 * pi",
 	}
 
 	for _, t := range tests {
